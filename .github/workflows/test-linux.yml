@@ -19,14 +19,32 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
+      - name: Install ccache
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache
+          echo "CCACHE_DIR=/tmp/nodejs-ccache" >> $GITHUB_ENV
+          echo "CCACHE_MAXSIZE=500M" >> $GITHUB_ENV
+      - name: Initialize Compiler Cache
+        id: cache
+        uses: actions/cache@v2
+        with:
+          path: /tmp/nodejs-ccache
+          key: cache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: cache-${{ runner.os }}-
       - uses: actions/checkout@v2
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v2
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Environment Information
-        run: npx envinfo
+        run: |
+          ccache -s
+          npx envinfo
       - name: Build
-        run: make build-ci -j2 V=1 CONFIG_FLAGS="--error-on-warn"
+        run: |
+          export PATH="/usr/lib/ccache:$PATH"
+          make build-ci -j2 V=1 CONFIG_FLAGS="--error-on-warn"
+          ccache -s
       - name: Test
         run: make run-ci -j2 V=1 TEST_CI_ARGS="-p actions"
